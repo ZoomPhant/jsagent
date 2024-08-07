@@ -197,7 +197,6 @@ const verify = async (url, settings, timeout) => {
 const collect = async (url, baseWebsite, platform) => {
     const isMobile = platform === 'mobile';
     const options = await Promise.resolve((platform === 'mobile' ? config.mobile : config.desktop))
-    const settings = {... options.settings }
 
     const statusEvent = helper.event('spm-webservice-page-load-status', true)
         .catalogs('UserExperience/Function').level(EventLevel.Cleared).data('OK')
@@ -210,7 +209,7 @@ const collect = async (url, baseWebsite, platform) => {
 
     const startTime = Date.now()
     try {
-        const info = await verify(url, settings, (params.timeout || 5));
+        const info = await verify(url, options.settings, (params.timeout || 5));
 
         // by default the event is OK
         formatter.addEvent(statusEvent.get())
@@ -259,9 +258,12 @@ const collect = async (url, baseWebsite, platform) => {
 
         logger.info('Got status code %d and run lighthouse against %s website %s (redirect: %s)', info.statusCode, platform, url, info.redirectUrl || '')
         await chrome.open()
-        settings.port = chrome.getOptions().port;
+        const flags = {
+            port: chrome.getOptions().port
+        };
+
         const start = Date.now()
-        const {lhr} = await lighthouse(info.redirectUrl || url, settings);
+        const {lhr} = await lighthouse(info.redirectUrl || url, flags, options);
 
         //*************************************/
         const jsonString = JSON.stringify(lhr, null, 2);

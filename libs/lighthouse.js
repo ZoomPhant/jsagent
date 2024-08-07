@@ -74,7 +74,7 @@ const lightHouseWrapper = async (url, flags = {}, configJSON, userConnection) =>
                     ],
                 },
             },
-            // ...configJSON
+             ...configJSON
         };
 
         logger.info('Running lighthouse session with custom audit on');
