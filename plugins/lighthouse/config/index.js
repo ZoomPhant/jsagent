@@ -61,6 +61,7 @@ const populates = import('lighthouse/core/config/constants.js').then((constants)
     desktop.settings.screenEmulation = constants.screenEmulationMetrics.desktop
     desktop.settings.emulatedUserAgent = constants.userAgents.desktop
 
+    // mobile using our dedicated throttling defined above
     mobile.settings.screenEmulation = constants.screenEmulationMetrics.mobile
     mobile.settings.emulatedUserAgent = constants.userAgents.mobile
 });

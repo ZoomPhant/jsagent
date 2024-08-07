@@ -67,7 +67,7 @@ COPY ./src ./src
 COPY ./plugins ./plugins
 COPY ./index.js ./
 
-COPY ./k8s/dumb-init /usr/bin/
+COPY ./docker/dumb-init /usr/bin/
 RUN chmod +x /usr/bin/dumb-init
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

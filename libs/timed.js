@@ -13,22 +13,21 @@ const {TimeoutError} = require('libs/errors')
  * @returns {{resolve: *, reject: *, timeout: number}}
  */
 module.exports = (resolve, reject, timeoutMillis, cleanup = () => {}, message) => {
+    // console.log("######## Create timeout - " + timeout + " with time " + timeoutMillis + "ms for " + message);
     const timeout = setTimeout(() => {
-        console.log("######## Fire timeout - " + timeout + " with time " + timeoutMillis + "ms for " + message);
+        // console.log("######## Fire timeout - " + timeout + " with time " + timeoutMillis + "ms for " + message);
         cleanup()
         reject(new TimeoutError(message || "Timed out"))
     }, timeoutMillis);
 
-    console.log("######## Create timeout - " + timeout + " with time " + timeoutMillis + "ms for " + message);
-
     return {
         resolve: (...args) => {
-            console.log("######## Clear timeout with resolved - " + timeout);
+            // console.log("######## Clear timeout with resolved - " + timeout);
             clearTimeout(timeout)
             resolve(...args);
         },
         reject: (...args) => {
-            console.log("######## Clear timeout with rejection - " + timeout);
+            // console.log("######## Clear timeout with rejection - " + timeout);
             clearTimeout(timeout)
             reject(...args);
         },
