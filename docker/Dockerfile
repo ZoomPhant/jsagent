@@ -55,6 +55,9 @@ RUN mkdir -p $APP_BASE/agent
 
 WORKDIR $APP_BASE/agent
 
+# Install lighthouse for testing purpose
+RUN npm install -g lighthouse
+
 # Install pm2
 # RUN npm install pm2 -g
 
@@ -69,6 +72,11 @@ COPY ./index.js ./
 
 COPY ./docker/dumb-init /usr/bin/
 RUN chmod +x /usr/bin/dumb-init
+
+#
+# Looks below won't run our service using created user, so what to do?
+## RUN useradd -ms /bin/bash zoomphant
+## USER zoomphant
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
