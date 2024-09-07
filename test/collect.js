@@ -214,14 +214,14 @@ const collect = async (url, baseWebsite, platform) => {
         // by default the event is OK
         formatter.addEvent(statusEvent.get())
         formatter.addEvent(statusResponseTime.get())
-        formatter.addMetric(helper.metric("CheckStatus", EventLevel.Info.ordinal()).label("platform", platform).get())
+        formatter.addMetric(helper.metric("CheckStatus", EventLevel.Info.value).label("platform", platform).get())
 
         if (info.status) {
             logger.error('Error verify %s website %s, status=%d', platform, url, info.status)
             formatter.addMetric(helper.metric("status", info.status).label("platform", platform).get())
 
             formatter.updateEvent(statusEvent.state(-1).level(EventLevel.Error).data((isMobile ? 'Mobile cannot' : 'Cannot') + ' load page').get())
-            formatter.updateMetric("CheckStatus", EventLevel.Error.ordinal())
+            formatter.updateMetric("CheckStatus", EventLevel.Error.value)
             return
         }
 
@@ -283,7 +283,7 @@ const collect = async (url, baseWebsite, platform) => {
         if (lhr.runtimeError?.code) {
             logger.error('Error running lighthouse for url ' + url + ' - ' + lhr.runtimeError.code + ": " + lhr.runtimeError.message)
             formatter.updateEvent(statusEvent.state(1).level(EventLevel.Error).data((isMobile ? 'Mobile failed' : 'Failed') + ' to load page due to error code ' + lhr.runtimeError?.code).get())
-            formatter.updateMetric("CheckStatus", EventLevel.Error.ordinal())
+            formatter.updateMetric("CheckStatus", EventLevel.Error.value)
             return
         }
 
@@ -418,18 +418,18 @@ const collect = async (url, baseWebsite, platform) => {
 
         if (loadTime > (2 * maxLoadTime)) {
             formatter.updateEvent(statusResponseTime.state(1).level(EventLevel.Error).data((isMobile ? 'Mobile page' : 'Page') + ' is too slow to load').get())
-            formatter.updateMetric("CheckStatus", EventLevel.Error.ordinal())
+            formatter.updateMetric("CheckStatus", EventLevel.Error.value)
             logger.warn('Found too large load time %f for lighthouse result on %s website %s', loadTime, platform, url)
         }
         else if (loadTime > maxLoadTime) {
             formatter.updateEvent(statusResponseTime.state(2).level(EventLevel.Warn).data((isMobile ? 'Mobile page' : 'Page') + ' is slow to load').get())
-            formatter.updateMetric("CheckStatus", EventLevel.Warn.ordinal())
+            formatter.updateMetric("CheckStatus", EventLevel.Warn.value)
             logger.warn('Found large load time %f for lighthouse result on %s website %s', loadTime, platform, url)
         }
 
         if(info.redirectUrl) {
             formatter.updateEvent(statusEvent.state(2).level(EventLevel.Warn).data((isMobile ? 'Mobile page' : 'Page') + ' redirects to ' + info.redirectUrl).get())
-            formatter.updateMetric("CheckStatus", EventLevel.Warn.ordinal())
+            formatter.updateMetric("CheckStatus", EventLevel.Warn.value)
         }
 
     } finally {
@@ -458,7 +458,12 @@ const main = async() => {
         await collect(url, website, 'mobile')
     }
 
-    return formatter.json()
+    const json= formatter.json()
+
+    console.log('Info level is: ' + EventLevel.Info.value);
+    console.log('######## Task done with result:\n' + JSON.stringify(json.dataEntries))
+
+    return json;
 }
 
 main()
