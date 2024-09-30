@@ -50,14 +50,13 @@ const make_request = (runtime, type, pendings, uuid, payload) => {
 
     return new Promise((resolve, reject) => {
         // don't wait too long
-        const timeout = setTimeout(() => handle_response(pendings, uuid, false, new Error("Timeout request - " + uuid)), 3000)
+        const timeout = setTimeout(() => handle_response(pendings, uuid, false, new Error("Timeout request - " + uuid)), 5000)
 
         pendings[uuid] = {
             resolve,
             reject,
             timeout,
         }
-
     })
 }
 

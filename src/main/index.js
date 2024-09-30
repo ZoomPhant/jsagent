@@ -649,7 +649,7 @@ module.exports = async (slaves) => {
                     () => {
                         delete state.pendings[taskId];
                     },
-                    "Task timed out - " + taskId + " (sequence=" + sequence + ")"
+                    "Task timed out - " + taskId + " (timeout=" + task.timeout + ", sequence=" + sequence + ")"
                 )
             };
         });
