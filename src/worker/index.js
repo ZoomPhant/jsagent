@@ -51,12 +51,12 @@ module.exports = (runtime) => {
 
             metrics.count("task_success", 1, {type});
             logger.info('Report execution success for %s task %s with sequence %s', type, taskId, sequence)
-            runtime.send('execute-response', {taskId, result})
+            runtime.send('execute-response', {type, taskId, result})
         }
         catch(error) {
             logger.error('Report execution error for %s task %s with sequence %s: %s', type, taskId, sequence, error.message)
             metrics.count("task_failure", 1, {type});
-            runtime.send('execute-response', {taskId, error})
+            runtime.send('execute-response', {type, taskId, error})
         }
         finally {
             metrics.observe("task_execute_time", clock(), {type})

@@ -23,45 +23,63 @@ server.baseURL = config.getBaseURL()
 
 const MOCKING = config.mode === 'mock'
 
-const getTasksMeta = async (requestMp) => {
+const getAccountIDs = async() => {
+    // JSONObject jo = ZPHttpClient.getHttpClient(accountId).getJson("/api/collectors/" + AgentInfo.getInstance(accountId).getAgentId() + "/accounts");
+    if(MOCKING) {
+        // simply return account ID of ca1
+        return {
+            data: ['ca123', 'ca456'],
+            status: 'OK'
+        }
+    }
+    
+    return http.get(server.baseURL + "api/collectors/" + config.id + "/accounts", server.config)
+}
+
+
+const getTasksMeta = async (account, requestMp) => {
     if(MOCKING) {
         return {
             taskUpdatedEpoch: '1',
             tasks: []
         }
     }
-
+    
     if(requestMp) {
-        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMetaWithMP", server.config)
+        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMetaWithMP", {account, ...server.config})
     }
     else {
-        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMeta", server.config)
+        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMeta", {account, ...server.config})
     }
 }
 
-const getTasksFeed = async () => {
+const getTasksFeed = async (account) => {
     if(MOCKING) {
+        // account is like caXXX
+        const base = account.substring(2)
         const resource = require(config.getRoot() + '/scripts/task.json')
+
+        const scriptParams = {}
+        scriptParams["ms" + base] = resource.scriptParams || {
+            "path": "/tmp/test"
+        };
+
         const resourceArr = [{
-            id: 'mr1',
-            account: 'ca1',
-            mpiId: 'mi1',
-            mpId: 'mp1',
-            name: 'resource 1',
+            id: 'mr' + base,
+            account: account,
+            mpiId: 'mi' + base,
+            mpId: 'mp' + base,
+            name: 'resource ' + base,
             tags: [],
             attributes: resource.attributes || {},
-            scriptParams: {
-                "ms1": resource.scriptParams || {
-                    "path": "/tmp/test"
-                }
-            },
+            scriptParams,
         }]
         
         const collectScript = fs.readFileSync(config.getRoot() + '/scripts/collect.js').toString('utf-8');
         const sdScript = fs.readFileSync(config.getRoot() + '/scripts/discover.js').toString('utf-8');
         
         const scriptArr = [{
-            id: 'ms1',
+            id: 'ms' + base,
             display: 'test script',
             collectDataType: 'json',
             collectScript,
@@ -75,9 +93,9 @@ const getTasksFeed = async () => {
         
         const taskArr = [{
             id: 1,
-            resourceId: 'mr1',
-            accountId: 'ca1',
-            scriptId: 'ms1',
+            resourceId: 'mr' + base,
+            accountId: account,
+            scriptId: 'ms' + base,
             frequency: 60,
             name: 'test instance',
         }]
@@ -86,25 +104,25 @@ const getTasksFeed = async () => {
             map[res.id] = res
             return map
         }, {})
-
+        
         const scripts = scriptArr.reduce((map, script) => {
             map[script.id] = script
             return map
         }, {})
-
+        
         const taskInstances = taskArr.reduce((map, task) => {
             map[task.id] = task
             return map
         }, {})
-
+        
         console.log('Generating task instances', taskInstances)
-
+        
         return {
             resources, scripts, taskInstances
         }
     }
     
-    return http.get(server.baseURL + "api/collectors/" + config.id + "/tasks", server.config)
+    return http.get(server.baseURL + "api/collectors/" + config.id + "/tasks", {account, ...server.config})
 }
 
 const postPing = async(data) => {
@@ -135,14 +153,14 @@ const mockOKResponse = () => {
     }
 }
 
-const reportManualTaskResult = async (result) => {
+const reportManualTaskResult = async (account, result) => {
     if(MOCKING) {
         console.log('Try report manual task result', result)
         return mockOKResponse()
     }
-
+    
     try {
-        await http.post(server.baseURL + 'api/data/manuallyTask', result, server.config)
+        await http.post(server.baseURL + 'api/data/manuallyTask', result, {account, ...server.config})
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report manually task result back to server - " + err.message);
@@ -150,32 +168,32 @@ const reportManualTaskResult = async (result) => {
 }
 
 /**
- * reportData are following JsonFormationData like
- * {
- *     labels: {...},
- *     dataEntries: [ ... ]
- * }
- *
- * Data entries is like follows
- * {
- *    metricName: 'xxxx',
- *    isNaN: true or false,
- *    value: double value,
- *    epoch: epochTimeInMillis,
- *    labels: {
- *       label1: xxxx,
- *       label2: xxxx
- *    }
- * }
- */
-const reportMetrics = async(reportData) => {
+* reportData are following JsonFormationData like
+* {
+*     labels: {...},
+*     dataEntries: [ ... ]
+* }
+*
+* Data entries is like follows
+* {
+*    metricName: 'xxxx',
+*    isNaN: true or false,
+*    value: double value,
+*    epoch: epochTimeInMillis,
+*    labels: {
+*       label1: xxxx,
+*       label2: xxxx
+*    }
+* }
+*/
+const reportMetrics = async(account, reportData) => {
     if(MOCKING) {
         console.log('Try report metrics data', reportData)
         return mockOKResponse()
     }
-
+    
     try {
-        await http.post(server.baseURL + 'api/data/add', reportData, server.config)
+        await http.post(server.baseURL + 'api/data/add', reportData, {account, ...server.config})
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report metrics back to server - " + err.message);
@@ -186,14 +204,14 @@ const reportMetrics = async(reportData) => {
 * Metrics are array of lines, each line is in following format
 *  metricName {label1=xxx, label2=xxx, ...} value
 */
-const reportMetricLines = async(metrics) => {
+const reportMetricLines = async(account, metrics) => {
     if(MOCKING) {
         console.log('Try report metrics lines', metrics)
         return mockOKResponse()
     }
-
+    
     try {
-        await http.post(server.baseURL + 'api/data/lineMetrics', metrics, server.config)
+        await http.post(server.baseURL + 'api/data/lineMetrics', metrics, {account, ...server.config})
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report metric lines back to server - " + err.message);
@@ -217,14 +235,14 @@ const reportMetricLines = async(metrics) => {
 *    ...
 *   ]}
 */
-const reportLogs = async(logs) => {
+const reportLogs = async(account, logs) => {
     if(MOCKING) {
         console.log('Try report log lines', logs)
         return mockOKResponse()
     }
-
-   try {
-        await http.post(server.baseURL + 'api/data/logs', logs, server.config)
+    
+    try {
+        await http.post(server.baseURL + 'api/data/logs', logs, {account, ...server.config})
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report logs back to server - " + err.message);
@@ -246,28 +264,28 @@ const reportLogs = async(logs) => {
 *    data: '...',
 * }
 */
-const reportEvents = async(events) => {
+const reportEvents = async(account, events) => {
     if(MOCKING) {
         console.log('Try report events', events)
         return mockOKResponse()
     }
-
+    
     try {
-        return http.post(server.baseURL + 'api/data/events', events, server.config)
+        return http.post(server.baseURL + 'api/data/events', events, {account, ...server.config})
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report events back to server - " + err.message);
     }
 }
 
-const reportSDResults = async(result) => {
+const reportSDResults = async(account, result) => {
     if(MOCKING) {
         console.log('Try report SD result', result)
         return mockOKResponse()
     }
-
+    
     try {
-        await http.post(server.baseURL + 'api/data/discovered', result, server.config)
+        await http.post(server.baseURL + 'api/data/discovered', result, {account, ...server.config})
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report SD results back to server - " + err.message);
@@ -287,7 +305,7 @@ const reportSDResults = async(result) => {
 *     agentId: xxx
 * }
 */
-const reportCollectorErrorMessage = async(msg) => {
+const reportCollectorErrorMessage = async(account, msg) => {
     if(typeof msg === 'string') {
         msg = {message: msg}
     }
@@ -303,9 +321,9 @@ const reportCollectorErrorMessage = async(msg) => {
         return mockOKResponse()
     }
     
-    return http.post(server.baseURL + '/api/collectors/' + config.id + '/manuallyTask', data, server.config)
+    return http.post(server.baseURL + '/api/collectors/' + config.id + '/manuallyTask', data, {account, ...server.config})
 }
 
 module.exports = {
-    getTasksFeed, getTasksMeta, postPing, reportSDResults, reportMetrics, reportManualTaskResult, reportLogs, reportEvents
+    getAccountIDs, getTasksFeed, getTasksMeta, postPing, reportSDResults, reportMetrics, reportManualTaskResult, reportLogs, reportEvents
 }

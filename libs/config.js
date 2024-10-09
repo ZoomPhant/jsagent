@@ -6,6 +6,7 @@ const root = process.env.AGENT_ROOT || '/usr/local/zoomphant/agent';
  *   "role": "slave",
  *   "cluster": true,
  *   "port": 9099,
+ *   "cloudMode": false,
  *   "httpd": {
  *     "enabled": true,
  *     "secure": false
