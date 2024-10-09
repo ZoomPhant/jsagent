@@ -8,13 +8,15 @@ const logger = require('libs/logger').get("protocol")
 
 const server = {
     baseURL: '',
-    config: {
-        params: {
-            agentId: config.id,
-            token: config.token
-        },
-        headers: {
-            "X-account-id": config.account
+    getConfig: (accountId) => {
+        return {
+            params: {
+                agentId: config.id,
+                token: config.token
+            },
+            headers: {
+                "X-account-id": accountId || config.account
+            }
         }
     }
 }
@@ -33,7 +35,7 @@ const getAccountIDs = async() => {
         }
     }
     
-    return http.get(server.baseURL + "api/collectors/" + config.id + "/accounts", server.config)
+    return http.get(server.baseURL + "api/collectors/" + config.id + "/accountIds", server.getConfig())
 }
 
 
@@ -46,10 +48,10 @@ const getTasksMeta = async (account, requestMp) => {
     }
     
     if(requestMp) {
-        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMetaWithMP", {account, ...server.config})
+        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMetaWithMP", server.getConfig(account))
     }
     else {
-        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMeta", {account, ...server.config})
+        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMeta", server.getConfig(account))
     }
 }
 
@@ -58,12 +60,12 @@ const getTasksFeed = async (account) => {
         // account is like caXXX
         const base = account.substring(2)
         const resource = require(config.getRoot() + '/scripts/task.json')
-
+        
         const scriptParams = {}
         scriptParams["ms" + base] = resource.scriptParams || {
             "path": "/tmp/test"
         };
-
+        
         const resourceArr = [{
             id: 'mr' + base,
             account: account,
@@ -122,7 +124,7 @@ const getTasksFeed = async (account) => {
         }
     }
     
-    return http.get(server.baseURL + "api/collectors/" + config.id + "/tasks", {account, ...server.config})
+    return http.get(server.baseURL + "api/collectors/" + config.id + "/tasks?technology=javascript", server.getConfig(account))
 }
 
 const postPing = async(data) => {
@@ -160,7 +162,7 @@ const reportManualTaskResult = async (account, result) => {
     }
     
     try {
-        await http.post(server.baseURL + 'api/data/manuallyTask', result, {account, ...server.config})
+        await http.post(server.baseURL + 'api/data/manuallyTask', result, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report manually task result back to server - " + err.message);
@@ -193,7 +195,7 @@ const reportMetrics = async(account, reportData) => {
     }
     
     try {
-        await http.post(server.baseURL + 'api/data/add', reportData, {account, ...server.config})
+        await http.post(server.baseURL + 'api/data/add', reportData, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report metrics back to server - " + err.message);
@@ -211,7 +213,7 @@ const reportMetricLines = async(account, metrics) => {
     }
     
     try {
-        await http.post(server.baseURL + 'api/data/lineMetrics', metrics, {account, ...server.config})
+        await http.post(server.baseURL + 'api/data/lineMetrics', metrics, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report metric lines back to server - " + err.message);
@@ -242,7 +244,7 @@ const reportLogs = async(account, logs) => {
     }
     
     try {
-        await http.post(server.baseURL + 'api/data/logs', logs, {account, ...server.config})
+        await http.post(server.baseURL + 'api/data/logs', logs, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report logs back to server - " + err.message);
@@ -271,7 +273,7 @@ const reportEvents = async(account, events) => {
     }
     
     try {
-        return http.post(server.baseURL + 'api/data/events', events, {account, ...server.config})
+        return http.post(server.baseURL + 'api/data/events', events, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report events back to server - " + err.message);
@@ -285,7 +287,7 @@ const reportSDResults = async(account, result) => {
     }
     
     try {
-        await http.post(server.baseURL + 'api/data/discovered', result, {account, ...server.config})
+        await http.post(server.baseURL + 'api/data/discovered', result, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report SD results back to server - " + err.message);
@@ -321,7 +323,7 @@ const reportCollectorErrorMessage = async(account, msg) => {
         return mockOKResponse()
     }
     
-    return http.post(server.baseURL + '/api/collectors/' + config.id + '/manuallyTask', data, {account, ...server.config})
+    return http.post(server.baseURL + '/api/collectors/' + config.id + '/manuallyTask', data, server.getConfig(account))
 }
 
 module.exports = {

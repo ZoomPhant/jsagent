@@ -1059,7 +1059,7 @@ module.exports = async (slaves) => {
     });
     
     if(config.role !== 'slave') {
-        if(config.cloudMode) {
+        if(config.server?.cloudMode) {
             // working in cloud mode
             state.synchronizer = setInterval(account_synchronizer, 5000)
         }
