@@ -134,7 +134,7 @@ const postPing = async(data) => {
         return {}
     }
     
-    return http.post(server.baseURL + 'api/ping', data, server.config)
+    return http.post(server.baseURL + 'api/ping', data, server.getConfig())
 }
 
 const mockOKResponse = () => {
