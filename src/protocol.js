@@ -133,8 +133,13 @@ const postPing = async(data) => {
         
         return {}
     }
-    
-    return http.post(server.baseURL + 'api/ping', data, server.getConfig())
+
+    try {
+        return http.post(server.baseURL + 'api/ping', data, server.getConfig())
+    }
+    catch(err) {
+        logger.error({stack: err.stack}, "Cannot send ping to server - " + err.message);
+    }
 }
 
 const mockOKResponse = () => {

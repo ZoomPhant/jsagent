@@ -191,7 +191,7 @@ module.exports = async (slaves) => {
                 statistics: {}
             })
             
-            logger.info({response}, "Got server ping response")
+            // logger.info({response}, "Got server ping response")
         }
         catch(error) {
             logger.error({stack: error.stack}, "Cannot ping server")
@@ -546,11 +546,19 @@ module.exports = async (slaves) => {
                 
                 const logEntries = result.logEntries || []
                 if (logEntries.length > 0) {
+                    logEntries.array.forEach(chunk => {
+                        chunk.tags = {...labels, ...(chunk.tags || {})}
+                    });
+
                     await reportLogs(taskManager.getAccount(), logEntries)
                 }
                 
                 const eventEntries = result.eventEntries || []
                 if (eventEntries.length > 0) {
+                    eventEntries.forEach(event => {
+                        event.tags = {...labels, ...(event.tags || {})}
+                    })
+
                     await reportEvents(taskManager.getAccount(), eventEntries)
                 }
             }
