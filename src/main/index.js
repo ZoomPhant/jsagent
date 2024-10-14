@@ -99,6 +99,8 @@ module.exports = async (slaves) => {
             promises: [],   // pending promises from slaves
         },
         
+        lastSyncEpoch: 0,
+        
         heartbeater: 0,    // keep sync with server
         
         synchronizer: 0,   // sync account information with server, for cloud mode only
@@ -216,6 +218,50 @@ module.exports = async (slaves) => {
         }
         
         return string.substring(0, limit)
+    }
+    
+    /**
+    * Execute server scheduled task with given parameters
+    * {
+    *   taskId: string,
+    *   timeout: number, // in in seconds
+    * }
+    * @param {*} worker 
+    * @param {*} taskScheduler 
+    * @param {*} task 
+    */
+    const executeServerScheduledTask = async(worker, taskManager, manualTask) => {
+        let retCode = 0;
+        let response = 'OK';
+        try {
+            const {taskId, scheduleAt = 0, sequence = 0} = manualTask.parameters
+            
+            const task = taskManager.getTask(taskId)
+            if (!task) {
+                throw new Error('Task not found - ' + taskId)
+            }
+            
+            if(task.frequency < 0x7fffffff) {
+                // not a server scheduled task
+                throw new Error('Not a server scheduled task - ' + taskId)
+            }
+            
+            // time to do
+            await dispatch_task(worker, taskManager, task, scheduleAt, sequence)
+        }
+        catch(error) {
+            logger.error({stack: error.stack}, "Cannot execute server scheduled task")
+            response = 'Error executing server scheduled task - ' + error.message
+            retCode = -1
+        }
+        
+        const result = {
+            id: manualTask.id,
+            retCode,
+            response,
+        }
+        
+        reportManualTaskResult(taskManager.getAccount(), result)
     }
     
     const runDebug = async(taskManager, task) => {
@@ -349,6 +395,11 @@ module.exports = async (slaves) => {
             return
         }
         
+        if(info.lastSyncEpoch > 0 && (Date.now() - info.lastSyncEpoch) < 1000) {
+            logger.info('Skip sync tasks for account - ' + accountId + ' as last sync is too recent');
+            return;
+        }
+        
         const taskManager = info.taskManager
         const taskScheduler = info.taskScheduler
         
@@ -409,9 +460,10 @@ module.exports = async (slaves) => {
                 taskManager.update(feed)
                 
                 const tasks = taskManager.getAllTasks()
-                logger.info("Try scheduling %d tasks ...", tasks.length)
                 
                 taskScheduler.scheduleAll(tasks)
+                
+                logger.info("Update task version from %s to %s", taskManager.getVersion(), meta.taskUpdatedEpoch)
                 
                 // update the version
                 taskManager.updateVersion(meta.taskUpdatedEpoch)
@@ -421,7 +473,12 @@ module.exports = async (slaves) => {
             // state.manualTasks.push(...(meta.tasks || []))
             for(const task of (meta.tasks || [])) {
                 if(task.scriptType === "debugCommand") {
-                    await runDebug(taskManager, task)
+                    runDebug(taskManager, task)
+                }
+                else if(task.scriptType === "serverSchedule") {
+                    info.serverTasks.push(task);
+                    
+                    logger.info({task: task.parameters}, "Adding server scheduled task to queue, total queued: %d", info.serverTasks.length);
                 }
                 else {
                     logger.warn({task}, "Ignore manual task");
@@ -430,6 +487,9 @@ module.exports = async (slaves) => {
         }
         catch(error) {
             logger.error({stack: error.stack}, "Cannot sync tasks with server")
+        }
+        finally {
+            info.lastSyncEpoch = Date.now();
         }
     }
     
@@ -549,7 +609,7 @@ module.exports = async (slaves) => {
                     logEntries.array.forEach(chunk => {
                         chunk.tags = {...labels, ...(chunk.tags || {})}
                     });
-
+                    
                     await reportLogs(taskManager.getAccount(), logEntries)
                 }
                 
@@ -558,7 +618,7 @@ module.exports = async (slaves) => {
                     eventEntries.forEach(event => {
                         event.tags = {...labels, ...(event.tags || {})}
                     })
-
+                    
                     await reportEvents(taskManager.getAccount(), eventEntries)
                 }
             }
@@ -594,7 +654,7 @@ module.exports = async (slaves) => {
     * @param taskId
     * @returns {number}
     */
-    const find_idle_worker = (taskId) => {
+    const find_idle_worker = () => {
         let rr = state.sched;
         for (let idx = 0; idx < state.workers.length; idx++) {
             const wid = state.workers[(rr + idx) % state.workers.length];
@@ -609,8 +669,8 @@ module.exports = async (slaves) => {
         state.stalled = true;
         metrics.peg("scheduler_stalled", 1);
         
-        // cannot happen
-        logger.error("No IDLE worker to service task - " + taskId)
+        logger.error("No IDLE worker to service task");
+        
         return 0;
     }
     
@@ -671,11 +731,11 @@ module.exports = async (slaves) => {
             logger.warn('Find %s task %s still running. Ignore current running cycle', type, taskId);
             metrics.count("task_duplicated", 1, {type});                        
         }
-
+        
         /**
-         * If it is duplicated in above else branch, we would replace pending info with new
-         * promise, so previous promise will eventually timeout as it won't receive notification
-         */
+        * If it is duplicated in above else branch, we would replace pending info with new
+        * promise, so previous promise will eventually timeout as it won't receive notification
+        */
         return new Promise((resolve, reject) => {            
             state.pendings[pendingKey] = {
                 taskId,
@@ -796,45 +856,81 @@ module.exports = async (slaves) => {
             return
         }
         
+        if(info.lastScheduleEpoch > 0 && (Date.now() - info.lastScheduleEpoch) < 500) {
+            // logger.info('Skip scheduling tasks for account - ' + accountId + ' as last scheduling is too recent');
+            return;
+        }
+        
         const taskManager = info.taskManager
         const taskScheduler = info.taskScheduler
         
         //
         // step 2: round-robin task scheduling
         while (true) {
-            const sched = taskScheduler.nextRunnable()
-            if(!sched) {
-                break
-            }
-            
-            const taskId = sched.task;
-            
-            // see if the task schedule exists
-            const task = taskManager.getTask(taskId)
-            if (!task) {
-                // shall not happen
-                logger.error("Try execute non-existing task - %s:%s", accountId, taskId);
-                continue;
-            }
-            
-            logger.info("Try dispatching task %s:%s for execution (scheduleAt=%d, sequence=%d) ...", accountId, taskId, sched.scheduleAt, sched.sequence);
-            
-            if(state.workers.length === 0) {
-                dispatch_task(0, taskManager, task, sched.scheduleAt, sched.sequence)
+            if(info.serverTasks.length > 0 || taskScheduler.hasNextRunnable()) {
+                // logger.info("Try dispatching tasks for account %s...", accountId);
             }
             else {
-                const worker = find_idle_worker(taskId);
+                // no task to run
+                // logger.info("No task to scheduled for account %s...", accountId);                
+                break;
+            }
+            
+            
+            let worker = 0
+            if(state.workers.length > 0) {
+                worker = find_idle_worker();
+                
                 if (!worker) {
+                    // logger.info("No idle worker for dispatching tasks for account %s", accountId);
+                    
                     // no idle worker, wait next time
                     break;
                 }
-                
-                // time to do
-                dispatch_task(worker, taskManager, task, sched.scheduleAt, sched.sequence).finally(() => {
-                    free_worker(worker);
-                })
             }
+            
+            // logger.info("Try dispatching task for account %s to worker %d...", accountId, worker);
+            
+            new Promise(async (resolve, reject) => {
+                try {
+                    // do we have any server scheduled tasks to execute? let's favor them first
+                    if(info.serverTasks.length > 0) {
+                        const serverTask = info.serverTasks.shift();
+                        logger.info("Try dispatching server scheduled task %s for account %s to worker %d...", serverTask.id, accountId, worker);
+                        await executeServerScheduledTask(worker, taskManager, serverTask)
+                    }
+                    else {
+                        const sched = taskScheduler.nextRunnable()
+                        if(sched) {
+                            logger.info("Try dispatching task %s for account %s to worker %d...", sched.task, accountId, worker);
+                            const taskId = sched.task;
+                            
+                            // see if the task schedule exists
+                            const task = taskManager.getTask(taskId)
+                            if (!task) {
+                                throw new Error("Try execute non-existing task - " + accountId + ":" + taskId);
+                            }
+                            
+                            logger.info("Try dispatching task %s:%s for execution (scheduleAt=%d, sequence=%d) ...", accountId, taskId, sched.scheduleAt, sched.sequence);
+                            
+                            await dispatch_task(worker, taskManager, task, sched.scheduleAt, sched.sequence)
+                        }
+                    }
+                    
+                    resolve()
+                }
+                catch(err) {
+                    logger.error(err, "Error processing task for account %s", accountId);
+                    reject(err)
+                }
+            }).finally(() => {
+                if(worker > 0) {
+                    free_worker(worker);
+                }
+            })
         }
+        
+        info.lastScheduleEpoch = Date.now();
     }
     
     /**
@@ -843,8 +939,11 @@ module.exports = async (slaves) => {
     const start_scheduler = async(account, measurePerformance) => {
         const info = state.schedulers[account] = {
             account: config.account,
+            lastScheduleEpoch: 0,
             scheduler: 0,
+            lastSyncEpoch: 0,
             synchronizer: 0,
+            serverTasks: [],
             taskManager: TaskManager(account),
             taskScheduler: TaskScheduler(account)
         }
@@ -860,7 +959,13 @@ module.exports = async (slaves) => {
     * For cloud mode, synchronize accounts and create account schedulers
     */
     const account_synchronizer  = async () => {
+        if(state.lastSyncEpoch > 0 && (Date.now() - state.lastSyncEpoch) < 2000) {
+            logger.info('Skip syncing account IDs as last sync is too recent');
+            return;
+        }
+        
         try {
+            // logger.info('Try syncing account IDs');
             const response = await protocol.getAccountIDs();
             
             const accounts = response.data || []
@@ -870,7 +975,6 @@ module.exports = async (slaves) => {
             
             // if diff in existing, it is disappearing
             // if diff in accounts, it is newly found
-            
             for (const account of diffs) {
                 if(accounts.indexOf(account) >= 0) {
                     logger.info("Start scheduler for new account - " + account);
@@ -895,7 +999,10 @@ module.exports = async (slaves) => {
             }
         }
         catch(error) {
-            logger.error({stack: error.stack}, "Cannot synchronize account IDs")
+            logger.error
+        }
+        finally {
+            state.lastSyncEpoch = Date.now();
         }
     }
     
@@ -1184,7 +1291,7 @@ module.exports = async (slaves) => {
                     let worker = 0;
                     let retries = 0;
                     while(retries < 3) {
-                        worker = find_idle_worker(taskId);
+                        worker = find_idle_worker();
                         if(worker) {
                             break;
                         }

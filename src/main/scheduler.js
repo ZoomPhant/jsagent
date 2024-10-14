@@ -32,7 +32,7 @@ const protocol = require('src/protocol')
 */
 module.exports = (account) => {
     const logger = require('libs/logger').get('scheduler-' + account)
-
+    
     const state = {
         /** 
         * task schedules, a sorted list so we always remove tasks from top and put it back 
@@ -51,7 +51,7 @@ module.exports = (account) => {
     const getAccount = () => {
         return account;
     }
-
+    
     /**
     * Get a random start time for new task
     */
@@ -63,8 +63,6 @@ module.exports = (account) => {
     * Sync tasks info from server
     */
     const scheduleAll = tasks => {
-        logger.info("Try scheduling %d tasks ...", tasks.length)
-        
         // 
         // existing task schedules. A task is either in schedules or in pendings
         // If it is in pendings, we just ignore re-calculating the schedules,
@@ -91,6 +89,10 @@ module.exports = (account) => {
             if (task.frequency <= 0) {
                 logger.warn("Ignore task %s with zero or negative frequency %d!", task.id, task.frequency)
             }
+            else if(task.frequency >= 0x7fffffff) {
+                // server scheduled task, we don't need to schedule it
+                return;
+            }
             else {
                 const collect = existing[task.id] || {};
                 
@@ -108,6 +110,7 @@ module.exports = (account) => {
             }
         })
         
+        logger.info("Try scheduling %d tasks ...", schedules.length)
         
         // we have new tasks, so let's resort existing schedules to add in the new tasks
         // for task in pending, it will be done when the task execution timeout or finish
@@ -173,7 +176,13 @@ module.exports = (account) => {
         return sched;
     }
     
+    const hasNextRunnable = () => {
+        const sched = state.schedules[0]
+
+        return sched && sched.scheduleAt <= Date.now();
+    }
+    
     return {
-        getAccount, scheduleAll, nextRunnable
+        getAccount, scheduleAll, nextRunnable, hasNextRunnable
     }
 }

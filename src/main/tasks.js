@@ -7,8 +7,8 @@ const config = require('libs/config')
 
 module.exports = (accountId) => {
     const logger = require('libs/logger').get('tasks-' + accountId)
-
-
+    
+    
     /**
     * Task state
     *                                           <time to run>
@@ -84,7 +84,7 @@ module.exports = (accountId) => {
     const getAccount = () => {
         return accountId;
     }
-
+    
     /**
     * Sync tasks info from server
     */
@@ -133,13 +133,20 @@ module.exports = (accountId) => {
             
             /**
             * JS collector not support one time task ...
+            *   frequency == 0: one-time background task, not supported by JS collector for now
+            *   frequency >= 0x7fffffff: means the task is server scheduled
             */
-            if (task.frequency <= 0) {
+            const frequency = Number(task.frequency)
+            if (frequency <= 0) {
                 logger.warn(task, "Ignore task with zero or negative frequency!")
                 continue
             }
-            
-            logger.info('Found task %s (%s) with frequency %s ...', task.name, key, task.frequency)
+            else if(frequency >= 0x7fffffff) {
+                logger.info(task, "Task schedule managed by server!")
+            }
+            else {
+                logger.info('Found task %s (%s) with frequency %s ...', task.name, key, task.frequency)
+            }
             
             state.tasks[key] = task; // update or create the task
         }
@@ -289,7 +296,7 @@ module.exports = (accountId) => {
             "_product": resource.mpId,
         }
     }
-
+    
     return {
         update, getAccount, getVersion, updateVersion, getScript, getResource, getTask, getAllTasks, setTaskDiscovered, getTaskDiscovered, getScriptParams, getTaskEnvirons, getTaskLabels, getStatusDesc, setTaskStatus, getTaskStatus
     }

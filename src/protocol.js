@@ -48,10 +48,10 @@ const getTasksMeta = async (account, requestMp) => {
     }
     
     if(requestMp) {
-        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMetaWithMP", server.getConfig(account))
+        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMetaWithMP?technology=javascript", server.getConfig(account))
     }
     else {
-        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMeta", server.getConfig(account))
+        return http.get(server.baseURL + "api/collectors/" + config.id + "/tasksMeta?technology=javascript", server.getConfig(account))
     }
 }
 
@@ -167,7 +167,7 @@ const reportManualTaskResult = async (account, result) => {
     }
     
     try {
-        await http.post(server.baseURL + 'api/data/manuallyTask', result, server.getConfig(account))
+        await http.post(server.baseURL + 'api/collectors/manuallyTask', result, server.getConfig(account))
     }
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report manually task result back to server - " + err.message);
@@ -297,38 +297,6 @@ const reportSDResults = async(account, result) => {
     catch(err) {
         logger.error({stack: err.stack}, "Cannot report SD results back to server - " + err.message);
     }
-}
-
-/**
-* msg is a JSON object like 
-* {
-*     epoch: xxx, // milliseconds
-*     message: xxx,
-*     taskType: xxx,
-*     taskId: xxxx,
-*     resourceId: xxx,
-*     mpiId: xxxx,
-*     costTimeInMs: xxxx,
-*     agentId: xxx
-* }
-*/
-const reportCollectorErrorMessage = async(account, msg) => {
-    if(typeof msg === 'string') {
-        msg = {message: msg}
-    }
-    
-    const data = {
-        ...msg,
-        epoch: Date.now(),
-        agentId: config.id,
-    }
-    
-    if(MOCKING) {
-        console.log('Try report collector error', data)
-        return mockOKResponse()
-    }
-    
-    return http.post(server.baseURL + '/api/collectors/' + config.id + '/manuallyTask', data, server.getConfig(account))
 }
 
 module.exports = {
