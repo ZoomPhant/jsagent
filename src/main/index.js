@@ -999,7 +999,7 @@ module.exports = async (slaves) => {
             }
         }
         catch(error) {
-            logger.error
+            logger.error({stack: error.stack}, "Error syncing account IDs - " + error.message)
         }
         finally {
             state.lastSyncEpoch = Date.now();

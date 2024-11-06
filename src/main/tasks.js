@@ -138,14 +138,14 @@ module.exports = (accountId) => {
             */
             const frequency = Number(task.frequency)
             if (frequency <= 0) {
-                logger.warn(task, "Ignore task with zero or negative frequency!")
+                logger.warn(task, "Ignore task %s (%s) for script %s with zero or negative frequency!", task.name, key, task.scriptId)
                 continue
             }
             else if(frequency >= 0x7fffffff) {
-                logger.info(task, "Task schedule managed by server!")
+                logger.info(task, "Task %s (%s) for script %s is scheduled by server!", task.name, key, task.scriptId)
             }
             else {
-                logger.info('Found task %s (%s) with frequency %s ...', task.name, key, task.frequency)
+                logger.info('Found task %s (%s) for script %s with frequency %s ...', task.name, key, task.scriptId, task.frequency)
             }
             
             state.tasks[key] = task; // update or create the task

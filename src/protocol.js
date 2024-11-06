@@ -9,19 +9,27 @@ const logger = require('libs/logger').get("protocol")
 const server = {
     baseURL: '',
     getConfig: (accountId) => {
+        const headers = {
+            "X-account-id": accountId || config.account
+        }
+        
+        if (config.server.host) {
+            headers["Host"] = config.server.host
+        }
+        
         return {
             params: {
                 agentId: config.id,
                 token: config.token
             },
-            headers: {
-                "X-account-id": accountId || config.account
-            }
+            headers
         }
     }
 }
 
 server.baseURL = config.getBaseURL()
+
+logger.info("Using server base URL %s with host %s", server.baseURL, config.server.host)
 
 const MOCKING = config.mode === 'mock'
 

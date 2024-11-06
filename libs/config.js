@@ -8,6 +8,7 @@ const root = process.env.AGENT_ROOT || '/usr/local/zoomphant/agent';
 *   "port": 9099,
 *   "server": {
 *       "cloudMode": false,
+*       "address": "demo.zervice.us",
 *       "host": "demo.zervice.us",
 *       "port": "443",
 *       "baseUrl": "/",
@@ -44,21 +45,27 @@ config.getBaseURL = () => {
         baseUrl: '/'
     }
     
+    /**
+     * In our config.json we may have address and host
+     *   host    - The host to connect, will also be used as HOST header in request, must HAVE
+     *   address - the dns or IP to connect to, optional. If missing it would be the same as host
+     */
+    const host = server.address || server.host || '127.0.0.1';
     if(server.secure) {
         if(server.port === 0 || server.port === 443) {
-            return 'https://' + server.host + server.baseUrl;
+            return 'https://' + host + server.baseUrl;
         }
         else {
-            return 'https://' + server.host + ":" + server.port + server.baseUrl;
+            return 'https://' + host + ":" + server.port + server.baseUrl;
         }
     }
     else {
         if(server.port === 0 || server?.port === 443) {
-            return 'http://' + server.host + server.baseUrl;
+            return 'http://' + host + server.baseUrl;
         }
         else {
-            return 'http://' + server.host + ":" + server.port + server.baseUrl;
-        }    
+            return 'http://' + host + ":" + server.port + server.baseUrl;
+        }
     }
 }
 

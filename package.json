@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "description": "JavaScript Zervice Agent",
   "main": "index.js",
+  
   "scripts": {
     "run": "node index.js",
     "dev": "NODE_PATH=. node index.js",
     "mock": "AGENT_ROOT=test node index.js",
     "slave": "AGENT_ROOT=envs/slave node index.js",
-    "test": "AGENT_ROOT=envs/test node index.js"
+    "test": "AGENT_ROOT=envs/test node index.js",
+    "prod": "AGENT_ROOT=envs/prod node index.js"
   },
   "repository": {
     "type": "git",
