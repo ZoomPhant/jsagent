@@ -93,3 +93,4 @@ const lightHouseWrapper = async (url, flags = {}, configJSON, userConnection) =>
 }
 
 module.exports = lightHouseWrapper;
+module.exports.lhApi = LH
