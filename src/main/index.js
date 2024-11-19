@@ -267,7 +267,7 @@ module.exports = async (slaves) => {
     const runDebug = async(taskManager, task) => {
         const retCode = 0;
         
-        let response
+        let response = ''
         
         if("!help" === task.command) {
             const argument = (task.arguments || [''])[0];
@@ -294,7 +294,26 @@ module.exports = async (slaves) => {
         else if("!uptime" === task.command) {
             response = "The collector has been running for " + startMoment.fromNow(true)
         }
-        else if ("!task" !== task.command) {
+        else if ("!feed" === task.command) {
+            const argument = (task.arguments || [''])[0];
+
+            if (!argument) {
+                response = "Usage: \n\t!feed <taskId>\n\tFeed the task with given taskId";
+            } else {
+                const task = taskManager.getTask(argument);
+                if (!task) {
+                    response = "No task found with given ID";
+                } else {
+                    const resource = taskManager.getResource(task.resourceId);
+                    if (resource) {
+                        response = "=====================================\n"
+                        response += JSON.stringify(resource, null, 2)
+                    } else {
+                        response = "No resource found with given ID";
+                    }
+                }
+            }
+        } else if ("!task" !== task.command) {
             // command not recognized or
             // if("!list" === task.command) {
             response = ("!list" === task.command ? "Supported commands:\n" : "Unknown or not supported debug task!\n");

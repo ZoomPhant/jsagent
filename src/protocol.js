@@ -86,7 +86,7 @@ const getTasksFeed = async (account) => {
         }]
         
         const collectScript = fs.readFileSync(config.getRoot() + '/scripts/collect.js').toString('utf-8');
-        const sdScript = fs.readFileSync(config.getRoot() + '/scripts/discover.js').toString('utf-8');
+        const sdScript = fs.existsSync(config.getRoot() + '/scripts/discover.js') ? fs.readFileSync(config.getRoot() + '/scripts/discover.js').toString('utf-8') : '';
         
         const scriptArr = [{
             id: 'ms' + base,

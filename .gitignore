@@ -1,0 +1,5 @@
+node_modules
+envs
+test_*
+.local*
+.vscode
