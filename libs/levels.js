@@ -3,6 +3,7 @@ class EventLevel {
      * Note: keep consistence with server side definition
      * @type {EventLevel}
      */
+    static Unknown = new EventLevel("unknown", 0x80000000);
     static Cleared = new EventLevel("cleared", -1);
     static Info = new EventLevel("info", 0)
     static Warn = new EventLevel("warn", 1)

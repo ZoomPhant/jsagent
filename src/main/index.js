@@ -24,7 +24,8 @@ const TaskManager = require('./tasks')
 const TaskScheduler = require('./scheduler')
 const ChromeWrapper = require('./chrome')
 
-const TASK_TIMEOUT_MS = 120 * 1000; // in millis
+const TASK_TIMEOUT_MS = 180 * 1000; // in millis
+const QUEUE_TIMEOUT_MS = 120 * 1000;
 const MIN_METRICS_EPOCH = 30 * 1000;// in millis, avoid too frequent metrics processing
 
 /**
@@ -196,7 +197,7 @@ module.exports = async (slaves) => {
             // logger.info({response}, "Got server ping response")
         }
         catch(error) {
-            logger.error({stack: error.stack}, "Cannot ping server")
+            logger.error("Cannot ping server - " + error.message);
         }
     };
     
@@ -233,24 +234,27 @@ module.exports = async (slaves) => {
     const executeServerScheduledTask = async(worker, taskManager, manualTask) => {
         let retCode = 0;
         let response = 'OK';
+        const {taskId, scheduleAt = 0, sequence = 0} = manualTask.parameters
+        
         try {
-            const {taskId, scheduleAt = 0, sequence = 0} = manualTask.parameters
-            
             const task = taskManager.getTask(taskId)
             if (!task) {
+                logger.error("Try executing non-existing server scheduled task %s with sequence %d and scheduledAt %d ...", taskId, sequence, scheduleAt)
                 throw new Error('Task not found - ' + taskId)
             }
             
             if(task.frequency < 0x7fffffff) {
                 // not a server scheduled task
+                logger.error("Try executing server scheduled task %s with sequence %d and scheduledAt %d, but frequency is not -1 (%d)...", taskId, sequence, scheduleAt, task.frequency)                
                 throw new Error('Not a server scheduled task - ' + taskId)
             }
             
             // time to do
+            logger.info("Try executing server scheduled task %s with sequence %d and scheduledAt %d ...", taskId, sequence, scheduleAt)
             await dispatch_task(worker, taskManager, task, scheduleAt, sequence)
         }
         catch(error) {
-            logger.error({stack: error.stack}, "Cannot execute server scheduled task")
+            logger.error({stack: error.stack}, "Cannot execute server scheduled task %d with sequence %d", taskId, sequence)
             response = 'Error executing server scheduled task - ' + error.message
             retCode = -1
         }
@@ -525,7 +529,7 @@ module.exports = async (slaves) => {
                 metrics.count("task_timeouts", 1, {type: 'discover'})
             }
             else {
-                metrics.count('tasks_failure', 1, {type: 'discover'})
+                metrics.count('task_failure', 1, {type: 'discover'})
             }
             
             // found error
@@ -586,7 +590,7 @@ module.exports = async (slaves) => {
                 metrics.count("task_timeouts", 1, {type: 'discover'})
             }
             else {
-                metrics.count('tasks_failure', 1, {type: 'discover'})
+                metrics.count('task_failure', 1, {type: 'discover'})
             }
             
             taskManager.setTaskStatus(taskId, 'collect', {
@@ -1045,7 +1049,7 @@ module.exports = async (slaves) => {
                 const {type, task, taskId, clock, scheduleAt, sequence} = queued;
                 metrics.observe("task_queued_time", clock(), {type})
                 
-                if (scheduleAt - Date.now() > TASK_TIMEOUT_MS) {
+                if (scheduleAt - Date.now() > QUEUE_TIMEOUT_MS) {
                     logger.warn("Ignore timedout %s task (taskId=%s, sequence=%d)", type, taskId, sequence);
                     continue;
                 }
